@@ -7,7 +7,7 @@ Time tracking and client portal for Valere. Staff log hours to Monday-synced **a
 - Next.js 14 App Router, Tailwind, Prisma
 - Local database: SQLite
 - Production: Aurora PostgreSQL via `DATABASE_URL` on Amplify Hosting (AWS account `735948691025`)
-- Auth: Cognito (Amplify Gen 2) with Google SSO for `@valere.io`, email/password for invited clients
+- Auth: Cognito (Amplify Gen 2) with Google Workspace SAML for `@valere.io`, email/password for invited clients
 - Cron: Amplify functions call `/api/internal/cron` (Monday sync, retainers, Drive ingest)
 
 ## Local setup
@@ -33,9 +33,9 @@ Open http://localhost:3000
 ## Amplify
 
 1. Configure AWS CLI for account `735948691025`.
-2. `npx ampx sandbox secret set GOOGLE_CLIENT_ID` (and `GOOGLE_CLIENT_SECRET`, `APP_CRON_SECRET`).
-3. `npx ampx sandbox --once`
-4. Connect `Valerelabs/TimeTracker2.0` in Amplify Hosting. Set `DATABASE_URL`, `APP_SESSION_SECRET`, `APP_CRON_SECRET`, `APP_ADMIN_EMAILS`, `APP_MONDAY_API_TOKEN`.
-5. Add the production callback URL to Cognito Google IdP.
+2. Set the Amplify secrets required by `amplify/auth/resource.ts` and `APP_CRON_SECRET`.
+3. `npx ampx sandbox --once` provisions the `GoogleWorkspace` SAML IdP from `amplify/auth/google-workspace-metadata.ts`.
+4. Connect `Valerelabs/TimeTracker2.0` in Amplify Hosting. Set `DATABASE_URL`, `APP_SESSION_SECRET`, `APP_CRON_SECRET`, `APP_ADMIN_EMAILS`, `APP_MONDAY_API_TOKEN`, and the `APP_COGNITO_*` variables.
+5. Keep the Google Workspace SAML app enabled for the intended Valere organizational units.
 
 See [docs/architecture.md](docs/architecture.md), [docs/monday-mapping.md](docs/monday-mapping.md), [docs/chatbot-prompt.md](docs/chatbot-prompt.md), and [docs/amplify-deploy.md](docs/amplify-deploy.md).

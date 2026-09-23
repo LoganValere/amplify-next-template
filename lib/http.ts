@@ -8,6 +8,7 @@ export function jsonError(error: unknown) {
       { status: error.status },
     );
   }
+  console.error("Unhandled route error", error);
   const message = error instanceof Error ? error.message : "Unexpected error";
   return NextResponse.json({ error: message, code: "INTERNAL" }, { status: 500 });
 }

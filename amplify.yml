@@ -1,15 +1,16 @@
 version: 1
-backend:
-  phases:
-    build:
-      commands:
-        - npm ci --cache .npm --prefer-offline
-        - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
 frontend:
   phases:
+    preBuild:
+      commands:
+        - npm ci
+        - npx prisma db push --skip-generate
+        - npx prisma generate
     build:
       commands:
-        - npx prisma generate
+        # Amplify exposes branch variables to the build only; the SSR compute
+        # reads them from .env.production at runtime.
+        - env | grep -E '^(DATABASE_URL|APP_)' >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next
@@ -18,5 +19,4 @@ frontend:
   cache:
     paths:
       - .next/cache/**/*
-      - .npm/**/*
       - node_modules/**/*

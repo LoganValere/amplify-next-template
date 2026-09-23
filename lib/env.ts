@@ -15,6 +15,9 @@ const schema = z.object({
   APP_GOOGLE_REFRESH_TOKEN: z.string().optional().default(""),
   APP_BASE_URL: z.string().default("http://localhost:3000"),
   APP_AWS_ACCOUNT_ID: z.string().default("735948691025"),
+  APP_COGNITO_REGION: z.string().default("us-east-1"),
+  APP_COGNITO_USER_POOL_ID: z.string().default("us-east-1_Ct7xz39IV"),
+  APP_COGNITO_CLIENT_ID: z.string().default("58p23lr1o6cbm1lh0erhhcljq9"),
   NODE_ENV: z.string().optional(),
 });
 
