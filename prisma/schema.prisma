@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String        @id @default(cuid())
+  cognitoSub     String?       @unique
+  email          String        @unique
+  name           String
+  role           String        @default("STAFF")
+  passwordHash   String?
+  clientId       String?
+  hourCategoryId String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  client         Client?       @relation(fields: [clientId], references: [id])
+  hourCategory   HourCategory? @relation(fields: [hourCategoryId], references: [id])
+  timeEntries    TimeEntry[]
+  timerSession   TimerSession?
+  grantsCreated  BudgetGrant[] @relation("GrantCreator")
+  revisions      TimeEntryRevision[]
+}
+
+model HourCategory {
+  id        String        @id @default(cuid())
+  name      String
+  slug      String        @unique
+  color     String
+  active    Boolean       @default(true)
+  sortOrder Int           @default(0)
+  users     User[]
+  entries   TimeEntry[]
+  grants    BudgetGrant[]
+  retainers Retainer[]
+}
+
+model Client {
+  id             String            @id @default(cuid())
+  mondayItemId   String            @unique
+  name           String
+  clientLabel    String?
+  status         String            @default("Active")
+  trackable      Boolean           @default(true)
+  office         String?
+  projectManager String?
+  accountManager String?
+  projectedEnd   DateTime?
+  archived       Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  users          User[]
+  contacts       ClientContact[]
+  entries        TimeEntry[]
+  grants         BudgetGrant[]
+  retainers      Retainer[]
+  integrations   IntegrationLink[]
+  chunks         ContractChunk[]
+  timerSessions  TimerSession[]
+}
+
+model TimeEntry {
+  id              String               @id @default(cuid())
+  userId          String
+  clientId        String
+  hourCategoryId  String
+  date            String
+  startTime       String?
+  endTime         String?
+  durationMinutes Int
+  description     String               @default("")
+  source          String               @default("manual")
+  kimaiHash       String?              @unique
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  user            User                 @relation(fields: [userId], references: [id])
+  client          Client               @relation(fields: [clientId], references: [id])
+  hourCategory    HourCategory         @relation(fields: [hourCategoryId], references: [id])
+  revisions       TimeEntryRevision[]
+
+  @@index([clientId, date])
+  @@index([userId, date])
+  @@index([clientId, hourCategoryId, date])
+}
+
+model TimeEntryRevision {
+  id           String    @id @default(cuid())
+  timeEntryId  String
+  actorId      String
+  previousJson String
+  createdAt    DateTime  @default(now())
+  timeEntry    TimeEntry @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+  actor        User      @relation(fields: [actorId], references: [id])
+}
+
+model TimerSession {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  clientId       String
+  hourCategoryId String
+  startedAt      DateTime
+  note           String   @default("")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client         Client   @relation(fields: [clientId], references: [id])
+}
+
+model BudgetGrant {
+  id             String       @id @default(cuid())
+  clientId       String
+  hourCategoryId String
+  hours          Float
+  type           String
+  note           String       @default("")
+  createdById    String?
+  effectiveAt    DateTime     @default(now())
+  retainerId     String?
+  periodStart    String?
+  createdAt      DateTime     @default(now())
+  client         Client       @relation(fields: [clientId], references: [id])
+  hourCategory   HourCategory @relation(fields: [hourCategoryId], references: [id])
+  createdBy      User?        @relation("GrantCreator", fields: [createdById], references: [id])
+  retainer       Retainer?    @relation(fields: [retainerId], references: [id])
+
+  @@unique([retainerId, periodStart])
+}
+
+model Retainer {
+  id                  String         @id @default(cuid())
+  clientId            String
+  hourCategoryId      String
+  hoursPerPeriod      Float
+  replenishDayOfMonth Int
+  timezone            String         @default("America/New_York")
+  startDate           String
+  endDate             String?
+  rolloverPolicy      String         @default("expire")
+  rolloverCapHours    Float?
+  active              Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  client              Client         @relation(fields: [clientId], references: [id])
+  hourCategory        HourCategory   @relation(fields: [hourCategoryId], references: [id])
+  grants              BudgetGrant[]
+}
+
+model ClientContact {
+  id       String         @id @default(cuid())
+  email    String
+  name     String
+  clientId String
+  userId   String?
+  status   String         @default("invited")
+  createdAt DateTime      @default(now())
+  client   Client         @relation(fields: [clientId], references: [id])
+
+  @@unique([email, clientId])
+}
+
+model IntegrationLink {
+  id         String          @id @default(cuid())
+  clientId   String
+  kind       String
+  externalId String
+  metadata   String          @default("{}")
+  createdAt  DateTime        @default(now())
+  client     Client          @relation(fields: [clientId], references: [id])
+}
+
+model ContractChunk {
+  id         String   @id @default(cuid())
+  clientId   String
+  sourceFile String
+  text       String
+  embedding  String   @default("[]")
+  createdAt  DateTime @default(now())
+  client     Client   @relation(fields: [clientId], references: [id])
+}
+
+model MondaySyncState {
+  id        String    @id @default(cuid())
+  boardId   String    @unique
+  watermark String?
+  lastRunAt DateTime?
+}
+
+model KimaiImportRow {
+  id                  String   @id @default(cuid())
+  batchId             String
+  raw                 String
+  status              String
+  customer            String
+  project             String
+  email               String
+  activity            String
+  date                String
+  fromTime            String
+  toTime              String
+  durationSeconds     Int      @default(0)
+  description         String   @default("")
+  suggestedClientId   String?
+  createdAt           DateTime @default(now())
+
+  @@index([batchId, status])
+}
