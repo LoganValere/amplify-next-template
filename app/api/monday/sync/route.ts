@@ -1,14 +1,8 @@
-import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/authz";
-import { jsonError } from "@/lib/http";
+import { createMondaySyncHandler } from "@/lib/monday/route-handlers";
 import { syncMondayAccounts } from "@/lib/monday/sync";
 
-export async function POST() {
-  try {
-    await requireAdmin();
-    const result = await syncMondayAccounts();
-    return NextResponse.json(result);
-  } catch (error) {
-    return jsonError(error);
-  }
-}
+export const POST = createMondaySyncHandler({
+  authorize: requireAdmin,
+  sync: syncMondayAccounts,
+});

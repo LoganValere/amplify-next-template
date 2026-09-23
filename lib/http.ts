@@ -3,12 +3,23 @@ import { AppError } from "@/lib/errors";
 
 export function jsonError(error: unknown) {
   if (error instanceof AppError) {
+    const details = error as AppError & {
+      missingColumnIds?: string[];
+      retryAfterMs?: number;
+    };
     return NextResponse.json(
-      { error: error.message, code: error.code },
+      {
+        error: error.message,
+        code: error.code,
+        ...(details.missingColumnIds ? { missingColumnIds: details.missingColumnIds } : {}),
+        ...(details.retryAfterMs !== undefined ? { retryAfterMs: details.retryAfterMs } : {}),
+      },
       { status: error.status },
     );
   }
   console.error("Unhandled route error", error);
-  const message = error instanceof Error ? error.message : "Unexpected error";
-  return NextResponse.json({ error: message, code: "INTERNAL" }, { status: 500 });
+  return NextResponse.json(
+    { error: "An unexpected error occurred", code: "INTERNAL" },
+    { status: 500 },
+  );
 }

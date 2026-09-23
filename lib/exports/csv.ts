@@ -7,6 +7,7 @@ export type ExportFilters = {
   to: string;
   clientId?: string;
   userId?: string;
+  hourCategoryId?: string;
 };
 
 export async function loadExportRows(actor: SessionUser, filters: ExportFilters) {
@@ -24,6 +25,7 @@ export async function loadExportRows(actor: SessionUser, filters: ExportFilters)
       date: { gte: filters.from, lte: filters.to },
       ...(filters.clientId ? { clientId: filters.clientId } : {}),
       ...(filters.userId ? { userId: filters.userId } : {}),
+      ...(filters.hourCategoryId ? { hourCategoryId: filters.hourCategoryId } : {}),
     },
     include: { user: { select: { id: true, name: true, email: true } }, client: true, hourCategory: true },
     orderBy: [{ date: "asc" }, { startTime: "asc" }],

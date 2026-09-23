@@ -23,4 +23,31 @@ ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query 'Role.Arn' --output
 aws amplify update-app --app-id "$APP_ID" --iam-service-role-arn "$ROLE_ARN"
 ```
 
-Set Hosting environment variables: `DATABASE_URL` (Aurora), `APP_SESSION_SECRET`, `APP_CRON_SECRET`, `APP_ADMIN_EMAILS`, `APP_MONDAY_API_TOKEN`, `APP_BASE_URL`.
+Set Hosting environment variables: `DATABASE_URL` (Aurora), `APP_SESSION_SECRET`,
+`APP_CRON_SECRET`, `APP_ADMIN_EMAILS`, and `APP_BASE_URL`. Before building, remove
+any legacy `APP_MONDAY_API_TOKEN` and `APP_MONDAY_ACCOUNTS_BOARD_ID` Hosting
+variables. Monday credentials and board selection are managed by the integration UI.
+
+## SSR compute role
+
+`amplify/backend.ts` defines one SSR compute role. Secrets Manager access remains
+limited to `arn:aws:secretsmanager:us-east-1:735948691025:secret:valere-portal/monday-*`,
+and Bedrock access is limited to `bedrock:InvokeModel` on
+`arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-micro-v1:0`. These are the
+only server-rendered AWS SDK clients that use the default credential chain. The
+deployment output `custom.ssrComputeRoleArn` contains the role ARN.
+
+After the backend stack is deployed, copy that output ARN into the Amplify
+Hosting app's SSR compute role setting during Task 6 rollout:
+
+```bash
+SSR_COMPUTE_ROLE_ARN="<custom.ssrComputeRoleArn output>"
+aws amplify update-app \
+  --app-id d1d1298kq4ckyb \
+  --compute-role-arn "$SSR_COMPUTE_ROLE_ARN"
+```
+
+Do not run this command until rollout. The role trust uses
+`aws:SourceAccount=735948691025` and `ArnLike aws:SourceArn`
+`arn:aws:amplify:us-east-1:735948691025:apps/d1d1298kq4ckyb/branches/*`.
+This repository intentionally does not attach it automatically.

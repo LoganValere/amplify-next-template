@@ -1,6 +1,22 @@
 import { prisma } from "@/lib/db";
-import { categoryBalance } from "@/lib/budgets/balance";
-import { monthRange } from "@/lib/retainers/period";
+import { categoryBalanceAsOf, findActiveRetainer } from "@/lib/budgets/balance";
+import { asOfBounds } from "@/lib/budgets/as-of";
+import {
+  indexUsage,
+  periodKeyFor,
+  usageStartFor,
+  type UsageIndex,
+} from "@/lib/budgets/retainer-balance";
+import { loadUsageByDate } from "@/lib/budgets/usage";
+import { DEFAULT_TZ, monthRange } from "@/lib/retainers/period";
+import {
+  buildBurndownPoints,
+  burndownDays,
+  projectZeroDate,
+  retainerBurndownPoints,
+  type BurndownPoint,
+} from "@/lib/reports/burndown";
+import { shiftBusinessDate } from "@/lib/time/business-date";
 
 export async function hoursReport(filters: {
   from: string;
@@ -52,60 +68,57 @@ function weekOf(ymd: string): string {
   return String(week).padStart(2, "0");
 }
 
+function maxDate(left: string, right: string): string {
+  return left > right ? left : right;
+}
+
 export async function burndownSeries(clientId: string, hourCategoryId: string, from: string, to: string) {
-  const entries = await prisma.timeEntry.findMany({
-    where: { clientId, hourCategoryId, date: { gte: from, lte: to } },
-    orderBy: { date: "asc" },
-  });
-  const grants = await prisma.budgetGrant.findMany({
-    where: { clientId, hourCategoryId },
-    orderBy: { effectiveAt: "asc" },
-  });
-  const days: string[] = [];
-  const cursor = new Date(`${from}T00:00:00Z`);
-  const end = new Date(`${to}T00:00:00Z`);
-  while (cursor <= end) {
-    days.push(cursor.toISOString().slice(0, 10));
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  const retainer = await findActiveRetainer(clientId, hourCategoryId);
+  const timeZone = retainer?.timezone || DEFAULT_TZ;
+  const { grantEffectiveBefore } = asOfBounds(to, timeZone);
+  // Anchor the series to the balance at the close of the window rather than
+  // the live balance, so a historical range is not pulled to today's number.
+  const latest = await categoryBalanceAsOf(clientId, hourCategoryId, to);
+
+  let points: BurndownPoint[];
+  let usage: UsageIndex;
+  if (retainer) {
+    const grants = await prisma.budgetGrant.findMany({
+      where: {
+        retainerId: retainer.id,
+        periodStart: { lte: periodKeyFor(to) },
+        effectiveAt: { lt: grantEffectiveBefore },
+      },
+    });
+    // Closed periods before the window still decide what carried into it, so
+    // the usage read reaches back as far as the rollover policy needs.
+    usage = indexUsage(
+      await loadUsageByDate(clientId, hourCategoryId, usageStartFor(retainer, grants, from), to),
+    );
+    points = retainerBurndownPoints(from, to, retainer, grants, usage);
+  } else {
+    const entries = await loadUsageByDate(clientId, hourCategoryId, from, to);
+    const grants = await prisma.budgetGrant.findMany({
+      where: { clientId, hourCategoryId, effectiveAt: { lt: grantEffectiveBefore } },
+      orderBy: { effectiveAt: "asc" },
+    });
+    usage = indexUsage(entries);
+    points = buildBurndownPoints(
+      burndownDays(from, to, grants, entries, timeZone),
+      latest.remainingHours,
+    );
   }
-  const usedByDay = new Map<string, number>();
-  for (const entry of entries) {
-    usedByDay.set(entry.date, (usedByDay.get(entry.date) ?? 0) + entry.durationMinutes / 60);
-  }
-  let remaining = 0;
-  const points: Array<{ date: string; remaining: number }> = [];
-  for (const day of days) {
-    for (const grant of grants) {
-      const effective = grant.effectiveAt.toISOString().slice(0, 10);
-      if (effective === day) {
-        remaining += grant.hours;
-      }
-    }
-    remaining -= usedByDay.get(day) ?? 0;
-    points.push({ date: day, remaining: Math.round(remaining * 100) / 100 });
-  }
-  const trailing = entries.filter((entry) => entry.date >= addDays(to, -28) && entry.date <= to);
-  const trailingHours = trailing.reduce((sum, entry) => sum + entry.durationMinutes / 60, 0);
-  const velocity = trailingHours / 28;
-  const latest = await categoryBalance(clientId, hourCategoryId);
-  let projectedZero: string | null = null;
-  if (velocity > 0 && latest.remainingHours > 0) {
-    const daysLeft = latest.remainingHours / velocity;
-    projectedZero = addDays(to, Math.ceil(daysLeft));
-  }
+
+  const trailingFrom = maxDate(from, shiftBusinessDate(to, -28));
+  const velocity = Math.round((usage.minutesBetween(trailingFrom, to) / 60 / 28) * 100) / 100;
   return {
     points,
-    velocityPerDay: Math.round(velocity * 100) / 100,
-    projectedZeroDate: velocity === 0 ? null : projectedZero,
+    velocityPerDay: velocity,
+    projectedZeroDate: projectZeroDate(to, latest.remainingHours, velocity),
     remainingHours: latest.remainingHours,
+    asOf: latest.asOf,
     mode: latest.mode,
     nextRefillDate: latest.nextRefillDate,
     period: latest.periodStart ? monthRange(latest.periodStart) : null,
   };
-}
-
-function addDays(ymd: string, days: number): string {
-  const date = new Date(`${ymd}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
 }

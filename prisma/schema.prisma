@@ -42,6 +42,7 @@ model HourCategory {
 model Client {
   id             String            @id @default(cuid())
   mondayItemId   String            @unique
+  mondayBoardId  String?
   name           String
   clientLabel    String?
   status         String            @default("Active")
@@ -184,6 +185,23 @@ model MondaySyncState {
   boardId   String    @unique
   watermark String?
   lastRunAt DateTime?
+}
+
+model MondayIntegration {
+  id                     String    @id @default("singleton")
+  boardId                String?
+  boardName              String?
+  secretArn              String?
+  pendingDeleteSecretArn String?
+  status                 String    @default("DISCONNECTED")
+  lastTestedAt           DateTime?
+  lastSyncedAt           DateTime?
+  lastErrorAt            DateTime?
+  lastErrorMessage       String?
+  leaseToken             String?
+  leaseExpiresAt         DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 }
 
 model KimaiImportRow {

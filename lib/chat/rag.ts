@@ -43,7 +43,7 @@ export async function answerClientQuestion(clientId: string, question: string): 
   ].join("\n");
 
   const env = getEnv();
-  if (env.APP_BEDROCK_REGION && process.env.AWS_ACCESS_KEY_ID) {
+  if (env.APP_BEDROCK_REGION) {
     try {
       const { BedrockRuntimeClient, InvokeModelCommand } = await import(
         "@aws-sdk/client-bedrock-runtime"

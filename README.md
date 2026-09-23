@@ -47,7 +47,7 @@ Open http://localhost:3000
 1. Configure AWS CLI for account `735948691025`.
 2. Set the Amplify secrets required by `amplify/auth/resource.ts` and `APP_CRON_SECRET`.
 3. `npx ampx sandbox --once` provisions the `GoogleWorkspace` SAML IdP from `amplify/auth/google-workspace-metadata.ts`.
-4. Connect `Valerelabs/TimeTracker2.0` in Amplify Hosting. Set `DATABASE_URL`, `APP_SESSION_SECRET`, `APP_CRON_SECRET`, `APP_ADMIN_EMAILS`, `APP_MONDAY_API_TOKEN`, and the `APP_COGNITO_*` variables.
+4. Connect `Valerelabs/TimeTracker2.0` in Amplify Hosting. Set `DATABASE_URL`, `APP_SESSION_SECRET`, `APP_CRON_SECRET`, `APP_ADMIN_EMAILS`, and the `APP_COGNITO_*` variables. `APP_MONDAY_API_TOKEN` is a local-development fallback only and must not be configured in Hosting.
 5. Keep the Google Workspace SAML app enabled for the intended Valere organizational units.
 
 See [docs/architecture.md](docs/architecture.md), [docs/monday-mapping.md](docs/monday-mapping.md), [docs/chatbot-prompt.md](docs/chatbot-prompt.md), and [docs/amplify-deploy.md](docs/amplify-deploy.md).

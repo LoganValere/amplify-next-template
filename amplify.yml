@@ -10,7 +10,7 @@ frontend:
       commands:
         # Amplify exposes branch variables to the build only; the SSR compute
         # reads them from .env.production at runtime.
-        - env | grep -E '^(DATABASE_URL|APP_)' >> .env.production
+        - env | grep -E '^(DATABASE_URL|APP_)' | grep -v '^APP_MONDAY_API_TOKEN=' >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next

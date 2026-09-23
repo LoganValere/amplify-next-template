@@ -6,7 +6,6 @@ const schema = z.object({
   APP_ADMIN_EMAILS: z.string().default(""),
   APP_CRON_SECRET: z.string().min(8),
   APP_MONDAY_API_TOKEN: z.string().optional().default(""),
-  APP_MONDAY_ACCOUNTS_BOARD_ID: z.string().default("4476095209"),
   APP_DEV_AUTH: z.string().optional().default("false"),
   APP_BEDROCK_REGION: z.string().default("us-east-1"),
   APP_BEDROCK_MODEL_ID: z.string().default("amazon.nova-micro-v1:0"),

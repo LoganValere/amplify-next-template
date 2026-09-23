@@ -1,6 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Alert } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
+import { DataTable, TableCell, TableHead, TableRow } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/form-field";
+import { PageHeader } from "@/components/ui/page-header";
+import { LoadingBlock } from "@/components/ui/skeleton";
+import { businessDateRange } from "@/lib/time/business-date";
 
 type Entry = {
   id: string;
@@ -12,67 +20,88 @@ type Entry = {
 };
 
 export default function ClientTimesheetsPage() {
-  const today = new Date().toISOString().slice(0, 10);
-  const fromDefault = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-  const [from, setFrom] = useState(fromDefault);
-  const [to, setTo] = useState(today);
+  // Resolved once on mount so the default window cannot shift between renders.
+  const [range, setRange] = useState(() => businessDateRange(30));
+  const { from, to } = range;
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const rangeQuery = new URLSearchParams({ from, to }).toString();
+  const rangeValid = Boolean(from) && Boolean(to) && from <= to;
 
   useEffect(() => {
-    void fetch(`/api/time?from=${from}&to=${to}`)
-      .then((res) => res.json())
-      .then((payload: { entries: Entry[] }) => setEntries(payload.entries ?? []));
-  }, [from, to]);
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    void fetch(`/api/time?${rangeQuery}`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("Unable to load timesheets.");
+        return response.json() as Promise<{ entries: Entry[] }>;
+      })
+      .then((payload) => setEntries(payload.entries ?? []))
+      .catch((requestError: unknown) => {
+        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
+        setError(requestError instanceof Error ? requestError.message : "Unable to load timesheets.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [rangeQuery]);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Timesheets</h1>
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex flex-col gap-1">
-          <label>From</label>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label>To</label>
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
-        <a className="underline text-sm" href={`/api/export?from=${from}&to=${to}&format=csv`}>
-          CSV
-        </a>
-        <a className="underline text-sm" href={`/api/export?from=${from}&to=${to}&format=pdf`}>
-          PDF
-        </a>
-      </div>
-      <table className="w-full text-sm">
-        <thead className="text-left text-valere-muted">
-          <tr>
-            <th className="py-2">Date</th>
-            <th>Person</th>
-            <th>Category</th>
-            <th>Hours</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.length === 0 ? (
-            <tr>
-              <td className="py-6 text-valere-muted" colSpan={5}>
-                No time in this range.
-              </td>
-            </tr>
+    <>
+      <PageHeader eyebrow="History" title="Timesheets" description="Review and export time recorded for your account." />
+      <Card className="mb-6">
+        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="grid flex-1 gap-3 sm:grid-cols-2">
+            <Input
+              id="timesheet-from"
+              label="From"
+              type="date"
+              value={from}
+              onChange={(event) => setRange((current) => ({ ...current, from: event.target.value }))}
+            />
+            <Input
+              id="timesheet-to"
+              label="To"
+              type="date"
+              value={to}
+              onChange={(event) => setRange((current) => ({ ...current, to: event.target.value }))}
+            />
+          </div>
+          {rangeValid ? (
+            <div className="flex gap-2">
+              <a className="inline-flex h-10 items-center rounded-md border px-3 text-sm font-medium hover:bg-valere-surface" href={`/api/export?${rangeQuery}&format=csv`}>Export CSV</a>
+              <a className="inline-flex h-10 items-center rounded-md border px-3 text-sm font-medium hover:bg-valere-surface" href={`/api/export?${rangeQuery}&format=pdf`}>Export PDF</a>
+            </div>
           ) : (
-            entries.map((entry) => (
-              <tr key={entry.id} className="border-t border-valere-border">
-                <td className="py-2">{entry.date}</td>
-                <td>{entry.user.name}</td>
-                <td>{entry.hourCategory.name}</td>
-                <td>{(entry.durationMinutes / 60).toFixed(2)}</td>
-                <td>{entry.description}</td>
-              </tr>
-            ))
+            <p className="text-xs text-valere-muted">Exports become available once the date range is valid.</p>
           )}
-        </tbody>
-      </table>
-    </div>
+        </CardContent>
+      </Card>
+      {error ? <Alert className="mb-5" tone="danger">{error}</Alert> : null}
+      {loading && entries.length === 0 ? (
+        <LoadingBlock label="Loading timesheets" />
+      ) : entries.length === 0 ? (
+        <EmptyState title="No time in this range" description="Try a broader date range." />
+      ) : (
+        <DataTable>
+          <caption className="sr-only">Time entries from {from} to {to}.</caption>
+          <thead><tr><TableHead>Date</TableHead><TableHead>Person</TableHead><TableHead>Category</TableHead><TableHead className="text-right">Hours</TableHead><TableHead>Notes</TableHead></tr></thead>
+          <tbody>
+            {entries.map((entry) => (
+              <TableRow key={entry.id}>
+                <TableCell>{entry.date}</TableCell>
+                <TableCell>{entry.user.name}</TableCell>
+                <TableCell>{entry.hourCategory.name}</TableCell>
+                <TableCell className="text-right tabular-nums">{(entry.durationMinutes / 60).toFixed(2)}</TableCell>
+                <TableCell className="min-w-48">{entry.description || <span className="text-valere-muted">—</span>}</TableCell>
+              </TableRow>
+            ))}
+          </tbody>
+        </DataTable>
+      )}
+    </>
   );
 }

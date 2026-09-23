@@ -1,3 +1,6 @@
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { BUSINESS_TZ } from "@/lib/time/business-date";
+
 export type TimerSegment = {
   date: string;
   startTime: string;
@@ -9,22 +12,32 @@ function pad(value: number): string {
   return String(value).padStart(2, "0");
 }
 
+/**
+ * Timer rows are stored as plain business dates, so every boundary here is
+ * evaluated in the business timezone rather than the server's local zone.
+ */
 function ymd(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return formatInTimeZone(date, BUSINESS_TZ, "yyyy-MM-dd");
 }
 
 function hm(date: Date): string {
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return formatInTimeZone(date, BUSINESS_TZ, "HH:mm");
 }
 
 function startOfNextDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, 0, 0, 0, 0);
+  const [year, month, day] = ymd(date).split("-").map(Number);
+  const nextDay = new Date(Date.UTC(year, month - 1, day + 1));
+  const nextYmd = `${nextDay.getUTCFullYear()}-${pad(nextDay.getUTCMonth() + 1)}-${pad(nextDay.getUTCDate())}`;
+  return fromZonedTime(`${nextYmd}T00:00:00`, BUSINESS_TZ);
 }
 
+/**
+ * Truncates to the minute on the absolute timeline. Local-field setters would
+ * re-resolve an ambiguous wall-clock time during a DST fall-back hour and move
+ * the instant by an hour.
+ */
 export function roundToMinute(date: Date): Date {
-  const copy = new Date(date);
-  copy.setSeconds(0, 0);
-  return copy;
+  return new Date(Math.floor(date.getTime() / 60000) * 60000);
 }
 
 export function splitTimerRange(startedAt: Date, endedAt: Date): TimerSegment[] {

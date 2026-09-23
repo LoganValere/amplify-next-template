@@ -9,5 +9,5 @@ export default async function HomePage() {
   if (session.role === "CLIENT") {
     redirect("/client/timesheets");
   }
-  redirect("/timer");
+  redirect("/overview");
 }

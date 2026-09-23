@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const to = url.searchParams.get("to");
     const format = url.searchParams.get("format") ?? "csv";
     const clientId = url.searchParams.get("clientId") ?? undefined;
+    const hourCategoryId = url.searchParams.get("hourCategoryId") ?? undefined;
     const scope = url.searchParams.get("scope");
     if (!from || !to) {
       throw new AppError("from and to are required");
@@ -21,6 +22,7 @@ export async function GET(request: NextRequest) {
       from,
       to,
       clientId: scope === "all" && actor.role === "ADMIN" ? undefined : clientId,
+      hourCategoryId,
     };
     const rows = await loadExportRows(actor, filters);
     if (format === "pdf") {

@@ -27,7 +27,7 @@ export default function ClientAskPage() {
       </p>
       <form onSubmit={onSubmit} className="space-y-3">
         <textarea className="w-full min-h-28" value={question} onChange={(e) => setQuestion(e.target.value)} />
-        <button className="rounded-md bg-white text-black px-4 py-2 text-sm" type="submit">
+        <button className="rounded-md bg-valere-fg text-white px-4 py-2 text-sm" type="submit">
           Ask
         </button>
       </form>

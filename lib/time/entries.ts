@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { AppError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import type { SessionUser } from "@/lib/auth/session";
 import { categoryBalance } from "@/lib/budgets/balance";
+import { timeWindowError } from "@/lib/time/time-window";
 
 export function hoursToMinutes(hours: number): number {
   return Math.round(hours * 60);
@@ -24,6 +25,10 @@ export async function createManualEntry(input: {
   }
   if (input.durationMinutes <= 0) {
     throw new AppError("Duration must be greater than zero");
+  }
+  const windowError = timeWindowError(input.startTime, input.endTime);
+  if (windowError) {
+    throw new AppError(windowError);
   }
   const client = await prisma.client.findUnique({ where: { id: input.clientId } });
   if (!client || !client.trackable || client.archived) {

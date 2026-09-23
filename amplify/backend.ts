@@ -2,6 +2,7 @@ import { defineBackend } from "@aws-amplify/backend";
 import { CfnUserPoolIdentityProvider } from "aws-cdk-lib/aws-cognito";
 import { auth } from "./auth/resource";
 import { googleWorkspaceSamlMetadata } from "./auth/google-workspace-metadata";
+import { createSsrComputeRole } from "./ssr-compute-role";
 import { storage } from "./storage/resource";
 import { mondaySync } from "./functions/monday-sync/resource";
 import { retainerReplenish } from "./functions/retainer-replenish/resource";
@@ -43,3 +44,12 @@ const googleWorkspace = new CfnUserPoolIdentityProvider(
 const { cfnUserPoolClient } = backend.auth.resources.cfnResources;
 cfnUserPoolClient.supportedIdentityProviders = ["GoogleWorkspace"];
 cfnUserPoolClient.addDependency(googleWorkspace);
+
+const hostingStack = backend.createStack("hosting-compute");
+const ssrComputeRole = createSsrComputeRole(hostingStack);
+
+backend.addOutput({
+  custom: {
+    ssrComputeRoleArn: ssrComputeRole.roleArn,
+  },
+});
