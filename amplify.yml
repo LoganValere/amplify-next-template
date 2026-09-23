@@ -4,7 +4,7 @@ frontend:
     preBuild:
       commands:
         - npm ci
-        - npx prisma db push --skip-generate
+        - npx prisma migrate deploy
         - npx prisma generate
     build:
       commands:
